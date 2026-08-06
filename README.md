@@ -14,7 +14,9 @@ One markdown note per session: the goal, the decisions and why, what you learned
 </div>
 
 <div align="center">
-  <img src="docs/pipeline.svg" alt="Pipeline: a session ends, the hook detaches and exits, rule gates decide, claude -p distils, one note lands in your vault. Anything refused is logged with a reason." width="100%">
+  <img src="docs/pipeline.png" alt="Pipeline: a session ends, the hook detaches and exits, rule gates decide, claude -p distils with tools denied, one note lands in your vault. Anything refused is logged with a reason." width="100%">
+  <br>
+  <sub><a href="docs/pipeline.html">Interactive version</a> · <a href="docs/pipeline.svg">SVG</a> · regenerate with <code>docs/render.sh</code></sub>
 </div>
 
 Four bash files and a prompt. No daemon, no database, no dependency beyond the `claude` CLI and `python3`.
@@ -200,7 +202,7 @@ bin/ctv-backfill       past transcripts. Idempotent, resumable.
 prompts/               the distillation prompt.
 install.sh             config + settings.json wiring, and uninstall.
 test/                  the rules, asserted.
-docs/pipeline.html     the diagram above, interactive.
+docs/                  the diagram: spec, interactive HTML, SVG, PNG.
 ```
 
 Requires bash, `python3`, and the `claude` CLI. macOS and Linux. WSL works. Native Windows does not.
