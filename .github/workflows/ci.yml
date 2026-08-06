@@ -65,5 +65,11 @@ jobs:
           export HOME="$PWD/.citmp2"; mkdir -p "$HOME"
           # No claude CLI on the runner, so the worker aborts. The entry path
           # must still return immediately and exit 0, or it would hang Claude Code.
-          echo '{"transcript_path":"/nope.jsonl","session_id":"x"}' | timeout 10 ./hooks/session-end.sh
-          echo "hook returned $?"
+          # No `timeout` on macOS runners, so poll instead. The entry path must
+          # return immediately even when the worker will fail, or closing a
+          # session would block on a model call.
+          echo '{"transcript_path":"/nope.jsonl","session_id":"x"}' | ./hooks/session-end.sh &
+          hp=$!
+          for _ in $(seq 1 20); do kill -0 "$hp" 2>/dev/null || break; sleep 0.5; done
+          if kill -0 "$hp" 2>/dev/null; then kill -9 "$hp"; echo "hook did not return in 10s"; exit 1; fi
+          wait "$hp"; echo "hook returned $?"
