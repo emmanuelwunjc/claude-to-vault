@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# claude-to-vault: distil PAST Claude Code transcripts into vault notes.
+#
+# Safe to re-run. Idempotent: a session that already has a note is skipped
+# without a model call, no matter what that note is named.
+#
+#   ctv-backfill                 distil everything not yet distilled
+#   ctv-backfill --dry-run       count what it would distil, call no models
+#   ctv-backfill --preview       print ONE note to stdout, write nothing
+#   ctv-backfill --limit 20      stop after 20 sessions
+#   ctv-backfill -j 8            run 8 at a time (default 3)
+#
+# A first backfill can be a large spend: one model call per session, over
+# every session you have ever run. Start with --preview, then --limit.
+set -uo pipefail
+
+# Resolve symlinks: without this, invoking through `ln -s` looks for lib/ next
+# to the LINK, and the hook then fails writing nothing and logging nothing.
+ctv_resolve_dir() {
+  local src="$1" dir
+  while [ -L "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+CTV_HOME="$(cd "$(ctv_resolve_dir "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source-path=SCRIPTDIR/..
+# shellcheck source=lib/vault-lib.sh
+. "$CTV_HOME/lib/vault-lib.sh"
+
+PROJECTS_DIR="${CTV_PROJECTS_DIR:-$HOME/.claude/projects}"
+PARALLEL=3
+DRY_RUN=0
+LIMIT=0            # 0 = no limit
+
+usage() { sed -n '2,14p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -j|--jobs)    PARALLEL="${2:-}"; shift 2 ;;
+    -l|--limit)   LIMIT="${2:-}"; shift 2 ;;
+    -n|--dry-run) DRY_RUN=1; shift ;;
+    -p|--preview) CTV_PREVIEW=1; LIMIT=1; PARALLEL=1; shift ;;
+    -h|--help)    usage; exit 0 ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+case "$PARALLEL" in ''|*[!0-9]*) PARALLEL=3 ;; esac
+case "$LIMIT"    in ''|*[!0-9]*) LIMIT=0 ;; esac
+export CTV_PREVIEW="${CTV_PREVIEW:-}"
+
+[ -d "$PROJECTS_DIR" ] || { echo "no transcripts at $PROJECTS_DIR" >&2; exit 1; }
+command -v "$CTV_CLAUDE_BIN" >/dev/null 2>&1 || {
+  echo "claude CLI not found: $CTV_CLAUDE_BIN" >&2
+  echo "install it, or set CTV_CLAUDE_BIN to its full path in your config." >&2
+  exit 1
+}
+[ -n "$CTV_PREVIEW" ] || mkdir -p "$CTV_VAULT_DIR"
+
+# --- Select candidates up front --------------------------------------------
+# Selection is cheap (no model calls), so doing it first buys an honest count
+# to show before any spend, and makes --limit mean what it says.
+total=0; noise=0; empty=0; done_already=0
+candidates="$(mktemp)"; trap 'rm -f "$candidates"' EXIT
+
+# --limit is applied HERE rather than by trimming the list afterwards. Trimming
+# a NUL-delimited file portably is awkward: macOS head has no -z and BSD awk
+# will not take NUL as a record separator, so both silently yielded zero.
+pending=0; selected=0
+while IFS= read -r -d '' f; do
+  total=$((total + 1))
+  if ctv_is_noise "$f";      then noise=$((noise + 1)); continue; fi
+  if ! ctv_has_content "$f"; then empty=$((empty + 1)); continue; fi
+  sid="$(basename "$f" .jsonl)"
+  if ctv_note_exists "$CTV_VAULT_DIR" "${sid:0:8}"; then done_already=$((done_already + 1)); continue; fi
+  pending=$((pending + 1))
+  if [ "$LIMIT" -eq 0 ] || [ "$selected" -lt "$LIMIT" ]; then
+    printf '%s\0' "$f" >> "$candidates"
+    selected=$((selected + 1))
+  fi
+done < <(find "$PROJECTS_DIR" -name '*.jsonl' -type f -print0 2>/dev/null)
+
+echo "claude-to-vault"
+echo "  transcripts found : $total"
+echo "  skipped as noise  : $noise"
+echo "  too short         : $empty"
+echo "  already have note : $done_already"
+echo "  to distil         : $pending"
+[ "$selected" != "$pending" ] && echo "  selected (--limit): $selected"
+echo "  vault             : $CTV_VAULT_DIR"
+echo
+
+if [ "$DRY_RUN" = "1" ]; then
+  # One model call per session, each up to CTV_MAX_BYTES of transcript. The
+  # byte figure is the honest ceiling; what it costs depends on your plan, so
+  # check your own pricing rather than trusting a number printed here.
+  echo "dry run: $selected session(s) would be distilled, one model call each,"
+  echo "up to $CTV_MAX_BYTES bytes of transcript per call on $CTV_MODEL."
+  echo "Nothing was written and no model was called."
+  [ "$selected" -gt 0 ] && { echo; echo "first few:"; n=0
+    while IFS= read -r -d '' f; do
+      n=$((n + 1)); [ "$n" -gt 5 ] && break
+      echo "  $(ctv_project_for "$f")/$(basename "$f" .jsonl | cut -c1-8)"
+    done < "$candidates"; }
+  exit 0
+fi
+
+[ "$selected" = "0" ] && { echo "nothing to do."; exit 0; }
+
+process() {
+  local f="$1" sid day out
+  sid="$(basename "$f" .jsonl)"
+  # Date from file mtime. Imprecise, but dedup keys on the session id, so a
+  # drifting mtime can no longer produce a second note for the same session.
+  day="$(date -r "$f" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)"
+  # Preview writes the note to stdout, so it must NOT be captured here.
+  if [ -n "$CTV_PREVIEW" ]; then
+    ctv_write_note "$f" "$sid" "$day" ", backfill"
+    return 0
+  fi
+  out="$(ctv_write_note "$f" "$sid" "$day" ", backfill")" || return 0
+  echo "wrote ${out##*/}"
+}
+
+# Exported so the xargs-spawned subshells inherit the rules rather than
+# redefining them. Every name these functions touch must be on these lines.
+export -f process ctv_ensure_logdir ctv_is_noise ctv_has_content ctv_is_bad_reply \
+          ctv_is_empty_reply ctv_feed_transcript ctv_project_for ctv_note_exists \
+          ctv_write_note ctv_log
+export CTV_VAULT_DIR CTV_MODEL CTV_MIN_LINES CTV_MAX_BYTES CTV_PROMPT CTV_CLAUDE_BIN \
+       CTV_LOGFILE CTV_POST_WRITE CTV_SKIP_PATTERNS CTV_DISALLOWED_TOOLS
+
+# NUL-delimited, and no -I{}: BSD xargs caps -I replacement at 255 bytes and
+# implies -x, so a single long transcript path aborted the entire run after
+# announcing a larger count. Looping inside the shell has no such limit.
+# shellcheck disable=SC2016  # $f is expanded by the spawned shell, not here
+xargs -0 -P "$PARALLEL" -n 20 bash -c 'for f; do process "$f"; done' _ < "$candidates"
+xargs_rc=$?
+[ "$xargs_rc" = "0" ] || echo "WARNING: worker dispatch exited $xargs_rc; some sessions may not have been distilled" >&2
+
+[ -n "$CTV_PREVIEW" ] && exit 0
+echo
+echo "done. notes in vault: $(find "$CTV_VAULT_DIR" -name '*.md' -type f | wc -l | tr -d ' ')"
+
+# NOTE: killing this script does not stop work already in flight. The workers
+# are spawned through xargs and do not carry this script's name, so a
+# `pkill -f ctv-backfill` leaves them running. To stop everything:
+#   pkill -f ctv-backfill; pkill -f "claude -p --model $CTV_MODEL"
