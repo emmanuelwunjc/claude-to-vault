@@ -199,6 +199,16 @@ ctv_write_note() {
 
   # rc separates "the call failed" (retired model id, auth, no credit) from
   # "the model returned nothing". Those used to look identical: silence.
+  # The distiller inherits any CLAUDE.md in scope, so a user's house style can
+  # prepend a greeting or confirmation marker to every note. The prompt forbids
+  # it, but a prompt is a request. Trimming to the first heading is a guarantee.
+  case "$body" in
+    '#'*) ;;
+    *) if printf '%s' "$body" | grep -q '^#'; then
+         body="$(printf '%s' "$body" | sed -n '/^#/,$p')"
+       fi ;;
+  esac
+
   ctv_is_empty_reply "$body" && { ctv_log "SKIP empty reply rc=$rc model=$CTV_MODEL session=$sid"; return 1; }
   ctv_is_bad_reply "$body" && { ctv_log "SKIP error reply session=$sid: $(printf '%s' "$body" | head -c 120)"; return 1; }
 

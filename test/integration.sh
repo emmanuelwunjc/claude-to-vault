@@ -85,6 +85,23 @@ printf '{"transcript_path":"%s","session_id":"abcdef12-1111-2222-3333-4444555566
 run_hook "$sb/bin/claude-ok"
 ok '! ls "$sb/vault"/*-abcdef12.md >/dev/null 2>&1' "subagent transcript produces no note"
 
+echo "A personal CLAUDE.md must not leak into the note:"
+# The distiller inherits any CLAUDE.md in scope. One that says "begin every reply
+# with <name>," puts that line at the top of every note in the vault.
+cat > "$sb/bin/claude-greeter" <<'STUB'
+#!/usr/bin/env bash
+cat >/dev/null
+printf 'Yiming,\n\n# proj (today)\n\n## Goal\nReal content.\n'
+STUB
+chmod +x "$sb/bin/claude-greeter"
+mk_event "0ddba11c-1111-2222-3333-444455556666"
+run_hook "$sb/bin/claude-greeter"
+gnote="$sb/vault/$(date +%Y-%m-%d)-sales_pipeline-0ddba11c.md"
+ok '[ -f "$gnote" ]'                       "note still written when the model greets first"
+ok '! grep -q "Yiming," "$gnote"'          "the greeting is stripped"
+ok 'grep -q "^# proj (today)$" "$gnote"'   "note body starts at the heading"
+ok 'grep -q "^## Goal$" "$gnote"'          "real content is preserved"
+
 echo "A write that fails must NOT report success:"
 # Unchecked, the redirect fails but the log still says WROTE and the function
 # returns 0. Rule 5 then dedups on a note that does not exist, so the next

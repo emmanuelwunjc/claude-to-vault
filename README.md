@@ -184,7 +184,7 @@ pkill -f ctv-backfill; pkill -f "claude -p --model claude-haiku"
 
 ```sh
 ./test/selftest.sh      # 24 assertions: the five rules, in isolation
-./test/integration.sh   # 27 assertions: the real hook and backfill, stub CLI
+./test/integration.sh   # 31 assertions: the real hook and backfill, stub CLI
 ```
 
 No network, no login, not a single token. `integration.sh` runs the actual hook against a fake `claude` and checks that a note appears with correct frontmatter, that a second run writes no duplicate, that an auth error never reaches the vault, and that a failed write is never logged as success. CI runs both on macOS and Linux, plus `shellcheck`, plus a check that install and uninstall leave a pre-existing `SessionEnd` hook intact.

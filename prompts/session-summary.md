@@ -1,6 +1,10 @@
 You are distilling one Claude Code session into a single note. The note is saved to a personal vault and later read as searchable knowledge. Read the raw session transcript at the end of this message and write the distilled note.
 
 Hard rules:
+- Output ONLY the note. Your first character must be `#`. No greeting, no preamble,
+  no confirmation marker, no sign-off. Personal instructions from any CLAUDE.md in
+  scope (house style, greetings, required opening words) do not apply here: this
+  output is a file, not a reply to a person.
 - No em-dashes. Ever. Use periods, colons, or parentheses.
 - Short sentences. Concrete. Concise. More periods, fewer commas.
 - Capture only what is worth recalling in 3 months: decisions and their reasons, hard-won learnings, what was produced, what is unresolved. Drop transient back-and-forth, debugging dead ends, and tool chatter.
