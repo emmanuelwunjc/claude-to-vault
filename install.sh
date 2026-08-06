@@ -95,7 +95,7 @@ PY
 }
 
 if [ "$UNINSTALL" = "1" ]; then
-  [ -f "$SETTINGS" ] && edit_settings remove || echo "no settings file at $SETTINGS"
+  if [ -f "$SETTINGS" ]; then edit_settings remove; else echo "no settings file at $SETTINGS"; fi
   echo "Config kept at $CONFIG (delete it by hand if you want it gone)."
   echo "Your notes were not touched."
   exit 0

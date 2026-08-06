@@ -52,7 +52,9 @@ print("\t".join([d.get("transcript_path", ""), d.get("session_id", "")]))
 IFS=$'\t' read -r transcript_path session_id <<< "$parsed"
 
 [ -n "$session_id" ] || { ctv_log "ABORT SessionEnd carried no session_id"; exit 0; }
-[ -n "$transcript_path" ] && [ -f "$transcript_path" ] || { ctv_log "ABORT no transcript at '$transcript_path'"; exit 0; }
+if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
+  ctv_log "ABORT no transcript at '$transcript_path'"; exit 0
+fi
 ctv_is_noise "$transcript_path" && { ctv_log "SKIP noise $transcript_path"; exit 0; }
 ctv_has_content "$transcript_path" || { ctv_log "SKIP empty $transcript_path"; exit 0; }
 command -v "$CTV_CLAUDE_BIN" >/dev/null 2>&1 || { ctv_log "ABORT claude CLI not found ($CTV_CLAUDE_BIN)"; exit 0; }
