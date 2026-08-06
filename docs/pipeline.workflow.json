@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "claude-to-vault",
+    "subtitle": "How one Claude Code session becomes one markdown note, and where it is refused",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "output": "docs/pipeline.html",
+    "viewBox": [
+      800,
+      720
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "external": {
+          "label": "Trigger"
+        },
+        "frontend": {
+          "label": "Hook"
+        },
+        "security": {
+          "label": "Gate or refusal"
+        },
+        "cloud": {
+          "label": "Model call"
+        },
+        "database": {
+          "label": "Note in your vault"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "trigger",
+      "label": "Trigger"
+    },
+    {
+      "id": "pipeline",
+      "label": "claude-to-vault"
+    },
+    {
+      "id": "model",
+      "label": "Distiller"
+    },
+    {
+      "id": "refused",
+      "label": "Refused, and logged",
+      "variant": "exception"
+    },
+    {
+      "id": "vault",
+      "label": "Your vault"
+    }
+  ],
+  "phases": [
+    {
+      "id": "intake",
+      "label": "Return instantly",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "decide",
+      "label": "Decide",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "write",
+      "label": "Distil and write",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "session",
+    "hook",
+    "gates",
+    "distiller",
+    "note"
+  ],
+  "nodes": [
+    {
+      "id": "session",
+      "lane": "trigger",
+      "col": 0,
+      "type": "external",
+      "label": "Session ends",
+      "sublabel": "SessionEnd event"
+    },
+    {
+      "id": "backfill",
+      "lane": "trigger",
+      "col": 2,
+      "type": "external",
+      "label": "ctv-backfill",
+      "sublabel": "past transcripts",
+      "tag": "idempotent"
+    },
+    {
+      "id": "hook",
+      "lane": "pipeline",
+      "col": 1,
+      "type": "frontend",
+      "label": "session-end.sh",
+      "sublabel": "detaches, exits 0",
+      "height": 68
+    },
+    {
+      "id": "gates",
+      "lane": "pipeline",
+      "col": 3,
+      "type": "security",
+      "label": "Rule gates",
+      "sublabel": "noise, empty, done",
+      "height": 68
+    },
+    {
+      "id": "distiller",
+      "lane": "model",
+      "col": 4,
+      "type": "cloud",
+      "label": "claude -p",
+      "sublabel": "240KB head+tail",
+      "tag": "tools denied"
+    },
+    {
+      "id": "note",
+      "lane": "vault",
+      "col": 5,
+      "type": "database",
+      "label": "Note",
+      "sublabel": "one per session"
+    },
+    {
+      "id": "refusal",
+      "lane": "refused",
+      "col": 3,
+      "type": "security",
+      "label": "Refused",
+      "sublabel": "logged with a reason"
+    }
+  ],
+  "edges": [
+    {
+      "from": "session",
+      "to": "hook",
+      "role": "main",
+      "label": "transcript path"
+    },
+    {
+      "from": "hook",
+      "to": "gates",
+      "role": "main",
+      "route": "straight"
+    },
+    {
+      "from": "gates",
+      "to": "distiller",
+      "role": "main"
+    },
+    {
+      "from": "distiller",
+      "to": "note",
+      "role": "main"
+    },
+    {
+      "from": "backfill",
+      "to": "gates",
+      "role": "branch"
+    },
+    {
+      "from": "gates",
+      "to": "refusal",
+      "role": "error"
+    },
+    {
+      "from": "distiller",
+      "to": "refusal",
+      "role": "error"
+    }
+  ]
+}
