@@ -72,6 +72,21 @@ Gist matched note body content. All 24 `test/selftest.sh` cases still pass.
   inherit exported functions), or every backfilled note silently fell back
   to no slug with a `command not found` line in the log.
 
+**Review round 2: clean.** Re-reviewed the fix commit specifically (388a9e6),
+adversarially. All five round-1 fixes held. Two non-blocking nits surfaced,
+not fixed, logged here as the record instead of a PR comment that dies at
+merge:
+- `ctv_slug_for_body` anchors on `# ` (h1). A model that used `## ` instead
+  (ignoring the heading-level instruction) silently produces no slug and no
+  WARN. Same failure class the fix closed, different trigger. Low value:
+  the prompt is explicit about `# `, and this hasn't been observed in
+  practice.
+- A gist that parses but is pure punctuation (e.g. `!!!`) slugifies to an
+  empty string with no WARN, since it took the `[ -n "$gist" ]` branch, not
+  the near-miss branch. Cosmetic, unlikely with real English gists.
+Neither is worth the added regex complexity right now. Revisit if either
+ever actually shows up in a real note.
+
 **Open:** the real vault (`/Users/yw1084/obsidian/sessions`) has not been
 backfilled with the new filename shape yet. 257 sessions queued as of this
 writing; run `bin/ctv-backfill` (no `--limit`) to do the full pass, or
