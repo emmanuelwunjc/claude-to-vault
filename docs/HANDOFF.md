@@ -41,6 +41,37 @@ Gist matched note body content. All 24 `test/selftest.sh` cases still pass.
 **Files touched:** `prompts/session-summary.md` (heading instructions),
 `lib/vault-lib.sh` (`ctv_write_note`: gist parse + slug + filename).
 
+**Review round 1 findings, fixed:** an independent adversarial review (via
+`fresh-eye`) of the first cut found:
+- **Blocking.** The 80-char slug cutoff could land exactly on a hyphen,
+  producing filenames like `...word--9767d1ef.md`. The trim-leading/trailing-
+  hyphens step ran only BEFORE the `cut`, never after. Fixed by trimming
+  again after the cut. The extraction logic was pulled out into its own
+  function, `ctv_slug_for_body`, specifically so this class of bug is
+  directly unit-testable without a model call: see the new "FILENAME GIST"
+  block in `test/selftest.sh`.
+- **Moderate, fixed.** A project name containing a colon, or a heading with
+  trailing punctuation after the closing paren (a common model habit despite
+  the prompt forbidding it), silently dropped the gist entirely with no log
+  line. Fixed: trailing junk after the heading's own closing paren is now
+  stripped before matching (without eating the paren itself), and a
+  near-miss (colon and parens present, but the shape still didn't match)
+  now logs a WARN line instead of failing silently.
+- **Considered and rejected.** Non-ASCII gist words (e.g. "résumé") get
+  mangled mid-word by the byte-oriented `[^a-z0-9]` slugify class
+  (`résumé`→`r-sum`) instead of being dropped cleanly. Cosmetic, not
+  data-destroying, and this pipeline's notes are personal-use English-project
+  gists in practice. Not fixed. Revisit if a non-English project ever hits
+  this.
+- Refactoring the extraction into `ctv_write_note` also surfaced a real bug
+  during my own testing, not the reviewer's: the extracted function used
+  `local heading gist slug` under `set -u`, and the no-match branches left
+  `slug` unbound, crashing every call that didn't produce a gist. Fixed by
+  initializing `slug=""`. Also had to add `ctv_slug_for_body` to the
+  `export -f` list in `bin/ctv-backfill` (xargs-spawned subshells only
+  inherit exported functions), or every backfilled note silently fell back
+  to no slug with a `command not found` line in the log.
+
 **Open:** the real vault (`/Users/yw1084/obsidian/sessions`) has not been
 backfilled with the new filename shape yet. 257 sessions queued as of this
 writing; run `bin/ctv-backfill` (no `--limit`) to do the full pass, or

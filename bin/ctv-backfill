@@ -128,7 +128,7 @@ process() {
 # redefining them. Every name these functions touch must be on these lines.
 export -f process ctv_ensure_logdir ctv_is_noise ctv_has_content ctv_is_bad_reply \
           ctv_is_empty_reply ctv_feed_transcript ctv_project_for ctv_note_exists \
-          ctv_write_note ctv_log
+          ctv_write_note ctv_log ctv_slug_for_body
 export CTV_VAULT_DIR CTV_MODEL CTV_MIN_LINES CTV_MAX_BYTES CTV_PROMPT CTV_CLAUDE_BIN \
        CTV_LOGFILE CTV_POST_WRITE CTV_SKIP_PATTERNS CTV_DISALLOWED_TOOLS
 

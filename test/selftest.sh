@@ -82,6 +82,26 @@ ok '! ctv_note_exists "$tmp/notes" "deadbeef"' "absent session reports no note"
 printf '{"a":1}\n{"a":2}\n' > "$tmp/nocwd.jsonl"
 ok '[ -n "$(ctv_project_for "$tmp/nocwd.jsonl")" ]' "transcript with no cwd still yields a project name"
 
+echo "FILENAME GIST (slug parsed from the model's own heading):"
+ok '[ "$(ctv_slug_for_body "# proj: fix vault path injection bug (2026-08-24)")" = "fix-vault-path-injection-bug" ]' \
+   "well-formed heading yields a clean slug"
+ok '[ -z "$(ctv_slug_for_body "# proj (2026-08-24)
+## Goal
+minimal session")" ]' "heading with no gist shape falls back to no slug"
+ok '[ "$(ctv_slug_for_body "# proj: fix vault path bug (2026-08-24).")" = "fix-vault-path-bug" ]' \
+   "trailing punctuation after the heading does not break the match"
+# A gist long enough that the 80-char cut lands exactly on a hyphen must not
+# leave a trailing hyphen in the filename. This is the bug that shipped:
+# "...word--sessionid.md".
+_longgist="$(printf 'x%.0s' $(seq 1 79)) boundaryword"
+_slug="$(ctv_slug_for_body "# proj: $_longgist (2026-08-24)")"
+ok 'case "$_slug" in *-) false;; *) true;; esac' "80-char cutoff never leaves a trailing hyphen"
+ok '[ "${#_slug}" -le 80 ]' "slug is capped at 80 chars"
+# A project name containing a colon must not crash the extraction; it degrades
+# to no slug (logged), not a hard failure.
+ok '[ -z "$(ctv_slug_for_body "# my:proj: fix vault path bug (2026-08-24)")" ]' \
+   "colon in project name falls back to no slug instead of misparsing"
+
 echo
 echo "RESULT: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
