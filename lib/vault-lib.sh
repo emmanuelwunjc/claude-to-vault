@@ -177,12 +177,11 @@ ctv_note_exists() {
 # Writes the note and echoes its path, or returns non-zero having logged why.
 ctv_write_note() {
   local transcript="$1" sid="$2" day="$3" tag="${4:-}"
-  local short="${sid:0:8}" project out body rc
+  local short="${sid:0:8}" project body rc
 
   ctv_ensure_logdir
   project="$(ctv_project_for "$transcript")"
   [ -n "$project" ] || project="unknown"
-  out="$CTV_VAULT_DIR/${day}-${project}-${short}.md"
 
   ctv_note_exists "$CTV_VAULT_DIR" "$short" && { ctv_log "SKIP already have a note for $short"; return 1; }
 
@@ -211,6 +210,20 @@ ctv_write_note() {
 
   ctv_is_empty_reply "$body" && { ctv_log "SKIP empty reply rc=$rc model=$CTV_MODEL session=$sid"; return 1; }
   ctv_is_bad_reply "$body" && { ctv_log "SKIP error reply session=$sid: $(printf '%s' "$body" | head -c 120)"; return 1; }
+
+  # The heading carries a gist ("# project: fix vault path bug (date)") so the
+  # filename can too: skimming a folder of "2026-08-24-myproj-a1b2c3d4.md"
+  # tells you nothing, the gist does. Parsed from the model's own heading
+  # rather than asked for separately, so there is only one source of truth
+  # for "what was this session about" and it can never disagree with itself.
+  # Minimal-session notes and any reply that skips the colon shape just fall
+  # back to the old filename: no gist, not a failure.
+  local gist slug out
+  gist="$(printf '%s' "$body" | head -1 | sed -n 's/^# [^:]*: \(.*\) (.*)$/\1/p')"
+  if [ -n "$gist" ]; then
+    slug="$(printf '%s' "$gist" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-80)"
+  fi
+  out="$CTV_VAULT_DIR/${day}-${project}${slug:+-$slug}-${short}.md"
 
   # Frontmatter is computed, never generated: the model writes prose, the code
   # writes anything you might later filter or sort on.
