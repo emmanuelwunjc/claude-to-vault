@@ -1,3 +1,6 @@
 .citmp*/
 *.bak
 .DS_Store
+
+# Agent lanes
+.worktrees/

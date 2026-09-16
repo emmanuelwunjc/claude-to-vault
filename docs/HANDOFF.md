@@ -1,8 +1,24 @@
-# claude-to-vault: session handoff
+# Handoff
 
-Append-only log of decisions and traps as they happen. Reorganize only at a
-real milestone. No test counts, no SHAs, no "N open PRs": derive those with
-`git log`.
+## Start here
+
+You are a fresh session and this file is your whole briefing. Nobody
+writes you a separate prompt. Do these in order, then work.
+
+1. Load skills `ship-loop`, `git-lanes` and `fresh-eye` before touching
+   anything. Read the repo `CLAUDE.md`.
+2. Read the LAST section of this file (the most recent date). It names
+   the first task, the tickets in order, and what waits on the owner.
+3. Run the recount commands that section carries before trusting any
+   number in it.
+4. Start the first task it names. Ask the owner nothing that section
+   already answers.
+
+Whoever closes a session rewrites the last section so step 2 stays true,
+and leaves this block alone.
+
+Judgment and reasoning only. No counts, no SHAs, no issue tallies: those rot
+within hours. Derive them with `gh issue list` and the scripts in the repo.
 
 ## 2026-08-24: note filenames now carry a gist
 
