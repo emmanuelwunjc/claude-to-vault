@@ -19,7 +19,18 @@ If the session was minimal (chit-chat, a single quick question, nothing substant
 
 Otherwise output GitHub-flavored markdown using this structure. Do NOT write YAML frontmatter (it is added automatically). Start at the heading. Drop any section that is empty.
 
-# {project} ({date})
+The heading MUST follow this exact shape, including the colon and parens: it
+is parsed to build the note's filename, so a session about API pricing files
+next to another API pricing session instead of getting buried under fifty
+identical "{project} (date)" names.
+
+# {project}: {gist} ({date})
+
+{gist} is 6 to 10 words naming what this session was SPECIFICALLY about,
+precise enough to tell it apart from every other session on this project
+(e.g. "fix command substitution injection via backticks in vault path", not
+"fix vault path bug"). Plain words only, no punctuation besides spaces and
+hyphens.
 
 ## Goal
 One line: what this session set out to do.
